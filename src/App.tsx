@@ -60,6 +60,38 @@ function App() {
   const [newCriteria, setNewCriteria] = useState({ question: '', description: '' })
   const [newPredictions, setNewPredictions] = useState<Record<string, string>>({})
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [showPasswordPrompt, setShowPasswordPrompt] = useState(false)
+
+  const handleUserSelection = (userId: string) => {
+    const selectedUser = PREDEFINED_USERS.find(u => u.id === userId)
+    if (!selectedUser) return
+    
+    if (selectedUser.isAdmin) {
+      setShowPasswordPrompt(true)
+    } else {
+      const user = (users || []).find(u => u.id === userId)
+      if (user) {
+        setCurrentUser(user)
+        toast.success(`Welcome, ${user.name}!`)
+      }
+    }
+  }
+
+  const handleAdminLogin = () => {
+    if (adminPassword === 'password1994') {
+      const adminUser = (users || []).find(u => u.id === 'admin')
+      if (adminUser) {
+        setCurrentUser(adminUser)
+        setShowPasswordPrompt(false)
+        setAdminPassword('')
+        toast.success('Welcome, Wedding Admin!')
+      }
+    } else {
+      toast.error('Incorrect password')
+      setAdminPassword('')
+    }
+  }
 
   // Initialize users if empty
   useEffect(() => {
@@ -69,7 +101,55 @@ function App() {
     }
   }, [users, setUsers])
 
-  // User selection for non-authenticated users
+  // Password prompt dialog for admin
+  if (showPasswordPrompt) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="font-heading text-2xl text-primary flex items-center justify-center gap-2">
+              <Crown className="text-accent" />
+              Admin Access
+            </CardTitle>
+            <p className="text-muted-foreground font-body">Enter the admin password</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label className="font-body">Password</Label>
+              <Input
+                type="password"
+                placeholder="Enter password..."
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAdminLogin()}
+                className="font-body"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowPasswordPrompt(false)
+                  setAdminPassword('')
+                }}
+                className="flex-1 font-body"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAdminLogin}
+                disabled={!adminPassword.trim()}
+                className="flex-1 font-body"
+              >
+                Login
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+          // User selection for non-authenticated users
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -82,13 +162,7 @@ function App() {
             <p className="text-muted-foreground font-body">Choose your name to join the game</p>
           </CardHeader>
           <CardContent>
-            <Select onValueChange={(userId) => {
-              const user = (users || []).find(u => u.id === userId)
-              if (user) {
-                setCurrentUser(user)
-                toast.success(`Welcome, ${user.name}!`)
-              }
-            }}>
+            <Select onValueChange={handleUserSelection}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select your name..." />
               </SelectTrigger>

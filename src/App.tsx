@@ -79,12 +79,17 @@ function App() {
 
   const handleAdminLogin = () => {
     if (adminPassword === 'password1994') {
-      const adminUser = (users || []).find(u => u.isAdmin)
+      // Find admin from predefined users first, then look in stored users
+      const predefinedAdmin = PREDEFINED_USERS.find(u => u.isAdmin)
+      const adminUser = (users || []).find(u => u.isAdmin) || (predefinedAdmin && { ...predefinedAdmin, score: 0 })
+      
       if (adminUser) {
         setCurrentUser(adminUser)
         setShowPasswordPrompt(false)
         setAdminPassword('')
         toast.success(`Welcome, ${adminUser.name}!`)
+      } else {
+        toast.error('Admin user not found')
       }
     } else {
       toast.error('Incorrect password')
@@ -99,6 +104,16 @@ function App() {
       setUsers(initialUsers)
     }
   }, [users, setUsers])
+
+  // Ensure current user has latest score data
+  useEffect(() => {
+    if (currentUser && users && users.length > 0) {
+      const updatedUser = users.find(u => u.id === currentUser.id)
+      if (updatedUser && updatedUser.score !== currentUser.score) {
+        setCurrentUser(updatedUser)
+      }
+    }
+  }, [users, currentUser, setCurrentUser])
 
   // Password prompt dialog for admin
   if (showPasswordPrompt) {

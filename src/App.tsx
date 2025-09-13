@@ -57,6 +57,9 @@ function App() {
   const [predictions, setPredictions] = useKV<Prediction[]>('wedding-predictions', [])
   const [answersLocked, setAnswersLocked] = useKV<boolean>('wedding-answers-locked', false)
   
+  // Force refresh of all data on app load to ensure sync
+  const [dataLoaded, setDataLoaded] = useState(false)
+  
   const [newCriteria, setNewCriteria] = useState({ question: '', description: '' })
   const [newPredictions, setNewPredictions] = useState<Record<string, string>>({})
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -98,13 +101,67 @@ function App() {
     }
   }
 
-  // Initialize users if empty
+  // Force data sync on app load and initialize users if empty
   useEffect(() => {
-    if (!users || users.length === 0) {
-      const initialUsers = PREDEFINED_USERS.map(user => ({ ...user, score: 0 }))
-      setUsers(initialUsers)
+    const initializeData = async () => {
+      try {
+        // Force refresh all data from KV store
+        const storedUsers = await window.spark.kv.get<User[]>('wedding-users')
+        const storedCriteria = await window.spark.kv.get<Criteria[]>('wedding-criteria')
+        const storedPredictions = await window.spark.kv.get<Prediction[]>('wedding-predictions')
+        const storedAnswersLocked = await window.spark.kv.get<boolean>('wedding-answers-locked')
+        
+        // Initialize users if none exist
+        if (!storedUsers || storedUsers.length === 0) {
+          const initialUsers = PREDEFINED_USERS.map(user => ({ ...user, score: 0 }))
+          await window.spark.kv.set('wedding-users', initialUsers)
+          setUsers(initialUsers)
+        } else {
+          setUsers(storedUsers)
+        }
+        
+        // Set other data if it exists
+        if (storedCriteria) setCriteria(storedCriteria)
+        if (storedPredictions) setPredictions(storedPredictions)
+        if (storedAnswersLocked !== undefined) setAnswersLocked(storedAnswersLocked)
+        
+        setDataLoaded(true)
+      } catch (error) {
+        console.error('Error loading data:', error)
+        // Fallback to initialize users
+        if (!users || users.length === 0) {
+          const initialUsers = PREDEFINED_USERS.map(user => ({ ...user, score: 0 }))
+          setUsers(initialUsers)
+        }
+        setDataLoaded(true)
+      }
     }
-  }, [users, setUsers])
+    
+    initializeData()
+  }, [])  // Only run on mount
+
+  // Periodic data refresh to keep devices in sync
+  useEffect(() => {
+    if (!dataLoaded) return
+    
+    const refreshInterval = setInterval(async () => {
+      try {
+        const storedCriteria = await window.spark.kv.get<Criteria[]>('wedding-criteria')
+        const storedPredictions = await window.spark.kv.get<Prediction[]>('wedding-predictions')
+        const storedUsers = await window.spark.kv.get<User[]>('wedding-users')
+        const storedAnswersLocked = await window.spark.kv.get<boolean>('wedding-answers-locked')
+        
+        if (storedCriteria) setCriteria(storedCriteria)
+        if (storedPredictions) setPredictions(storedPredictions)
+        if (storedUsers) setUsers(storedUsers)
+        if (storedAnswersLocked !== undefined) setAnswersLocked(storedAnswersLocked)
+      } catch (error) {
+        console.error('Error refreshing data:', error)
+      }
+    }, 5000) // Refresh every 5 seconds
+    
+    return () => clearInterval(refreshInterval)
+  }, [dataLoaded])
 
   // Ensure current user has latest score data
   useEffect(() => {
@@ -115,6 +172,20 @@ function App() {
       }
     }
   }, [users, currentUser])
+
+  // Show loading state while data is syncing
+  if (!dataLoaded) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-8 text-center">
+            <Heart weight="fill" className="text-accent mx-auto mb-4" size={48} />
+            <p className="text-muted-foreground font-body">Loading wedding predictions...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   // Password prompt dialog for admin
   if (showPasswordPrompt) {
@@ -195,23 +266,28 @@ function App() {
     )
   }
 
-  const addCriteria = () => {
+  const addCriteria = async () => {
     if (!newCriteria.question.trim()) return
     
-    const criteria = {
+    const newCriterion = {
       id: Date.now().toString(),
       question: newCriteria.question,
       description: newCriteria.description,
       winners: []
     }
     
-    setCriteria(prev => [...(prev || []), criteria])
+    const updatedCriteria = [...(criteria || []), newCriterion]
+    
+    // Update both state and KV store explicitly
+    setCriteria(updatedCriteria)
+    await window.spark.kv.set('wedding-criteria', updatedCriteria)
+    
     setNewCriteria({ question: '', description: '' })
     setDialogOpen(false)
     toast.success('New prediction added!')
   }
 
-  const submitPrediction = (criteriaId: string) => {
+  const submitPrediction = async (criteriaId: string) => {
     const answer = newPredictions[criteriaId]?.trim()
     if (!answer) return
 
@@ -223,13 +299,18 @@ function App() {
       timestamp: Date.now()
     }
 
-    setPredictions(prev => (prev || []).filter(p => !(p.userId === currentUser.id && p.criteriaId === criteriaId)).concat(prediction))
+    const updatedPredictions = (predictions || []).filter(p => !(p.userId === currentUser.id && p.criteriaId === criteriaId)).concat(prediction)
+    
+    // Update both state and KV store explicitly
+    setPredictions(updatedPredictions)
+    await window.spark.kv.set('wedding-predictions', updatedPredictions)
+    
     setNewPredictions(prev => ({ ...prev, [criteriaId]: '' }))
     toast.success('Prediction submitted!')
   }
 
-  const toggleWinner = (criteriaId: string, userId: string) => {
-    setCriteria(prev => (prev || []).map(c => {
+  const toggleWinner = async (criteriaId: string, userId: string) => {
+    const updatedCriteria = (criteria || []).map(c => {
       if (c.id === criteriaId) {
         const isCurrentlyWinner = c.winners.includes(userId)
         const newWinners = isCurrentlyWinner 
@@ -238,26 +319,34 @@ function App() {
         return { ...c, winners: newWinners }
       }
       return c
-    }))
+    })
+    
+    setCriteria(updatedCriteria)
+    await window.spark.kv.set('wedding-criteria', updatedCriteria)
 
     // Update scores
     const criterion = (criteria || []).find(c => c.id === criteriaId)
     if (criterion) {
       const isCurrentlyWinner = criterion.winners.includes(userId)
-      setUsers(prev => (prev || []).map(user => ({
+      const updatedUsers = (users || []).map(user => ({
         ...user,
         score: user.id === userId 
           ? user.score + (isCurrentlyWinner ? -1 : 1)
           : user.score
-      })))
+      }))
+      
+      setUsers(updatedUsers)
+      await window.spark.kv.set('wedding-users', updatedUsers)
     }
 
     toast.success('Score updated!')
   }
 
-  const toggleAnswerLock = () => {
-    setAnswersLocked(prev => !prev)
-    toast.success(answersLocked ? 'Answers unlocked!' : 'Answers locked!')
+  const toggleAnswerLock = async () => {
+    const newLockState = !answersLocked
+    setAnswersLocked(newLockState)
+    await window.spark.kv.set('wedding-answers-locked', newLockState)
+    toast.success(newLockState ? 'Answers locked!' : 'Answers unlocked!')
   }
 
   const getUserPrediction = (criteriaId: string) => {
@@ -477,6 +566,21 @@ function App() {
                   </Dialog>
                 </div>
               </div>
+
+              {/* Debug info for admin */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-body text-lg">Database Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 text-sm font-body">
+                    <p><strong>Total Questions:</strong> {(criteria || []).length}</p>
+                    <p><strong>Total Predictions:</strong> {(predictions || []).length}</p>
+                    <p><strong>Answers Locked:</strong> {answersLocked ? 'Yes' : 'No'}</p>
+                    <p><strong>Total Users:</strong> {(users || []).length}</p>
+                  </div>
+                </CardContent>
+              </Card>
 
               <div className="grid gap-4">
                 {(criteria || []).map(criterion => {

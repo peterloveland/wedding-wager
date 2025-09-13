@@ -50,12 +50,14 @@ const PREDEFINED_USERS: Omit<User, 'score'>[] = [
 ]
 
 function App() {
-  // Use shared KV storage so all devices see the same data
+  // Personal user state (per-device)
   const [currentUser, setCurrentUser] = useKV<User | null>('wedding-current-user', null)
-  const [users, setUsers] = useKV<User[]>('wedding-users', [])
-  const [criteria, setCriteria] = useKV<Criteria[]>('wedding-criteria', [])
-  const [predictions, setPredictions] = useKV<Prediction[]>('wedding-predictions', [])
-  const [answersLocked, setAnswersLocked] = useKV<boolean>('wedding-answers-locked', false)
+  
+  // Shared game state using a common key prefix
+  const [users, setUsers] = useKV<User[]>('shared-wedding-users', [])
+  const [criteria, setCriteria] = useKV<Criteria[]>('shared-wedding-criteria', [])
+  const [predictions, setPredictions] = useKV<Prediction[]>('shared-wedding-predictions', [])
+  const [answersLocked, setAnswersLocked] = useKV<boolean>('shared-wedding-answers-locked', false)
   
   // Force refresh of all data on app load to ensure sync
   const [dataLoaded, setDataLoaded] = useState(false)
@@ -105,16 +107,16 @@ function App() {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // Force refresh all data from KV store
-        const storedUsers = await window.spark.kv.get<User[]>('wedding-users')
-        const storedCriteria = await window.spark.kv.get<Criteria[]>('wedding-criteria')
-        const storedPredictions = await window.spark.kv.get<Prediction[]>('wedding-predictions')
-        const storedAnswersLocked = await window.spark.kv.get<boolean>('wedding-answers-locked')
+        // Force refresh all data from KV store using shared keys
+        const storedUsers = await window.spark.kv.get<User[]>('shared-wedding-users')
+        const storedCriteria = await window.spark.kv.get<Criteria[]>('shared-wedding-criteria')
+        const storedPredictions = await window.spark.kv.get<Prediction[]>('shared-wedding-predictions')
+        const storedAnswersLocked = await window.spark.kv.get<boolean>('shared-wedding-answers-locked')
         
         // Initialize users if none exist
         if (!storedUsers || storedUsers.length === 0) {
           const initialUsers = PREDEFINED_USERS.map(user => ({ ...user, score: 0 }))
-          await window.spark.kv.set('wedding-users', initialUsers)
+          await window.spark.kv.set('shared-wedding-users', initialUsers)
           setUsers(initialUsers)
         } else {
           setUsers(storedUsers)
@@ -146,10 +148,10 @@ function App() {
     
     const refreshInterval = setInterval(async () => {
       try {
-        const storedCriteria = await window.spark.kv.get<Criteria[]>('wedding-criteria')
-        const storedPredictions = await window.spark.kv.get<Prediction[]>('wedding-predictions')
-        const storedUsers = await window.spark.kv.get<User[]>('wedding-users')
-        const storedAnswersLocked = await window.spark.kv.get<boolean>('wedding-answers-locked')
+        const storedCriteria = await window.spark.kv.get<Criteria[]>('shared-wedding-criteria')
+        const storedPredictions = await window.spark.kv.get<Prediction[]>('shared-wedding-predictions')
+        const storedUsers = await window.spark.kv.get<User[]>('shared-wedding-users')
+        const storedAnswersLocked = await window.spark.kv.get<boolean>('shared-wedding-answers-locked')
         
         if (storedCriteria) setCriteria(storedCriteria)
         if (storedPredictions) setPredictions(storedPredictions)
@@ -280,7 +282,7 @@ function App() {
     
     // Update both state and KV store explicitly
     setCriteria(updatedCriteria)
-    await window.spark.kv.set('wedding-criteria', updatedCriteria)
+    await window.spark.kv.set('shared-wedding-criteria', updatedCriteria)
     
     setNewCriteria({ question: '', description: '' })
     setDialogOpen(false)
@@ -303,7 +305,7 @@ function App() {
     
     // Update both state and KV store explicitly
     setPredictions(updatedPredictions)
-    await window.spark.kv.set('wedding-predictions', updatedPredictions)
+    await window.spark.kv.set('shared-wedding-predictions', updatedPredictions)
     
     setNewPredictions(prev => ({ ...prev, [criteriaId]: '' }))
     toast.success('Prediction submitted!')
@@ -322,7 +324,7 @@ function App() {
     })
     
     setCriteria(updatedCriteria)
-    await window.spark.kv.set('wedding-criteria', updatedCriteria)
+    await window.spark.kv.set('shared-wedding-criteria', updatedCriteria)
 
     // Update scores
     const criterion = (criteria || []).find(c => c.id === criteriaId)
@@ -336,7 +338,7 @@ function App() {
       }))
       
       setUsers(updatedUsers)
-      await window.spark.kv.set('wedding-users', updatedUsers)
+      await window.spark.kv.set('shared-wedding-users', updatedUsers)
     }
 
     toast.success('Score updated!')
@@ -345,7 +347,7 @@ function App() {
   const toggleAnswerLock = async () => {
     const newLockState = !answersLocked
     setAnswersLocked(newLockState)
-    await window.spark.kv.set('wedding-answers-locked', newLockState)
+    await window.spark.kv.set('shared-wedding-answers-locked', newLockState)
     toast.success(newLockState ? 'Answers locked!' : 'Answers unlocked!')
   }
 

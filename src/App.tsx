@@ -50,12 +50,12 @@ const PREDEFINED_USERS: Omit<User, 'score'>[] = [
 ]
 
 function App() {
-  // Use shared KV storage for current user so all devices see the same login state
-  const [currentUser, setCurrentUser] = useKV<User | null>('current-user', null)
-  const [users, setUsers] = useKV<User[]>('users', [])
-  const [criteria, setCriteria] = useKV<Criteria[]>('criteria', [])
-  const [predictions, setPredictions] = useKV<Prediction[]>('predictions', [])
-  const [answersLocked, setAnswersLocked] = useKV<boolean>('answers-locked', false)
+  // Use shared KV storage so all devices see the same data
+  const [currentUser, setCurrentUser] = useKV<User | null>('wedding-current-user', null)
+  const [users, setUsers] = useKV<User[]>('wedding-users', [])
+  const [criteria, setCriteria] = useKV<Criteria[]>('wedding-criteria', [])
+  const [predictions, setPredictions] = useKV<Prediction[]>('wedding-predictions', [])
+  const [answersLocked, setAnswersLocked] = useKV<boolean>('wedding-answers-locked', false)
   
   const [newCriteria, setNewCriteria] = useState({ question: '', description: '' })
   const [newPredictions, setNewPredictions] = useState<Record<string, string>>({})

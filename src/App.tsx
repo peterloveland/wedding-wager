@@ -79,12 +79,12 @@ function App() {
 
   const handleAdminLogin = () => {
     if (adminPassword === 'password1994') {
-      const adminUser = (users || []).find(u => u.id === 'admin')
+      const adminUser = (users || []).find(u => u.isAdmin)
       if (adminUser) {
         setCurrentUser(adminUser)
         setShowPasswordPrompt(false)
         setAdminPassword('')
-        toast.success('Welcome, Wedding Admin!')
+        toast.success(`Welcome, ${adminUser.name}!`)
       }
     } else {
       toast.error('Incorrect password')

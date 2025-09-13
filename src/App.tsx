@@ -50,7 +50,11 @@ const PREDEFINED_USERS: Omit<User, 'score'>[] = [
 ]
 
 function App() {
-  const [currentUser, setCurrentUser] = useKV<User | null>('current-user', null)
+  // Use localStorage for current user to persist across sessions
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem('wedding-current-user')
+    return saved ? JSON.parse(saved) : null
+  })
   const [users, setUsers] = useKV<User[]>('users', [])
   const [criteria, setCriteria] = useKV<Criteria[]>('criteria', [])
   const [predictions, setPredictions] = useKV<Prediction[]>('predictions', [])
@@ -97,6 +101,15 @@ function App() {
     }
   }
 
+  // Save current user to localStorage whenever it changes
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('wedding-current-user', JSON.stringify(currentUser))
+    } else {
+      localStorage.removeItem('wedding-current-user')
+    }
+  }, [currentUser])
+
   // Initialize users if empty
   useEffect(() => {
     if (!users || users.length === 0) {
@@ -113,7 +126,7 @@ function App() {
         setCurrentUser(updatedUser)
       }
     }
-  }, [users, currentUser, setCurrentUser])
+  }, [users, currentUser])
 
   // Password prompt dialog for admin
   if (showPasswordPrompt) {

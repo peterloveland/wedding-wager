@@ -38,16 +38,17 @@ interface Prediction {
 }
 
 const PREDEFINED_USERS: Omit<User, 'score'>[] = [
-  { id: 'admin', name: 'Wedding Admin', isAdmin: true },
-  { id: 'pete', name: 'Pete', isAdmin: false },
+  { id: 'pete', name: 'Sexy Peter', isAdmin: true },
   { id: 'penny', name: 'Penny', isAdmin: false },
-  { id: 'alex', name: 'Alex', isAdmin: false },
-  { id: 'sarah', name: 'Sarah', isAdmin: false },
-  { id: 'mike', name: 'Mike', isAdmin: false },
-  { id: 'emma', name: 'Emma', isAdmin: false },
-  { id: 'tom', name: 'Tom', isAdmin: false },
+  { id: 'hannah', name: 'HanTwat', isAdmin: false },
+  { id: 'charlotte', name: 'Charlotte', isAdmin: false },
+  { id: 'jack', name: 'Jack', isAdmin: false },
+  { id: 'jess', name: 'Jess', isAdmin: false },
+  { id: 'bromley', name: 'Bromley', isAdmin: false },
   { id: 'lucy', name: 'Lucy', isAdmin: false },
-  { id: 'james', name: 'James', isAdmin: false }
+  { id: 'eddie', name: 'Eddie', isAdmin: false },
+  { id: 'ben', name: 'Ben', isAdmin: false },
+  { id: 'sophie', name: 'Sophie', isAdmin: false }
 ]
 
 function App() {

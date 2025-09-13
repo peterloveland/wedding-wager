@@ -50,11 +50,8 @@ const PREDEFINED_USERS: Omit<User, 'score'>[] = [
 ]
 
 function App() {
-  // Use localStorage for current user to persist across sessions
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('wedding-current-user')
-    return saved ? JSON.parse(saved) : null
-  })
+  // Use shared KV storage for current user so all devices see the same login state
+  const [currentUser, setCurrentUser] = useKV<User | null>('current-user', null)
   const [users, setUsers] = useKV<User[]>('users', [])
   const [criteria, setCriteria] = useKV<Criteria[]>('criteria', [])
   const [predictions, setPredictions] = useKV<Prediction[]>('predictions', [])
@@ -100,15 +97,6 @@ function App() {
       setAdminPassword('')
     }
   }
-
-  // Save current user to localStorage whenever it changes
-  useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('wedding-current-user', JSON.stringify(currentUser))
-    } else {
-      localStorage.removeItem('wedding-current-user')
-    }
-  }, [currentUser])
 
   // Initialize users if empty
   useEffect(() => {

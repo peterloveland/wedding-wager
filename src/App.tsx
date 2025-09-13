@@ -24,8 +24,6 @@ interface Criteria {
   id: string
   question: string
   description?: string
-  isLocked: boolean
-  isComplete: boolean
   winners: string[] // user IDs
 }
 
@@ -188,8 +186,6 @@ function App() {
       id: Date.now().toString(),
       question: newCriteria.question,
       description: newCriteria.description,
-      isLocked: false,
-      isComplete: false,
       winners: []
     }
     
@@ -216,20 +212,31 @@ function App() {
     toast.success('Prediction submitted!')
   }
 
-  const markWinners = (criteriaId: string, winnerIds: string[]) => {
-    setCriteria(prev => (prev || []).map(c => 
-      c.id === criteriaId 
-        ? { ...c, winners: winnerIds, isComplete: true }
-        : c
-    ))
+  const toggleWinner = (criteriaId: string, userId: string) => {
+    setCriteria(prev => (prev || []).map(c => {
+      if (c.id === criteriaId) {
+        const isCurrentlyWinner = c.winners.includes(userId)
+        const newWinners = isCurrentlyWinner 
+          ? c.winners.filter(id => id !== userId)
+          : [...c.winners, userId]
+        return { ...c, winners: newWinners }
+      }
+      return c
+    }))
 
     // Update scores
-    setUsers(prev => (prev || []).map(user => ({
-      ...user,
-      score: user.score + (winnerIds.includes(user.id) ? 1 : 0)
-    })))
+    const criterion = (criteria || []).find(c => c.id === criteriaId)
+    if (criterion) {
+      const isCurrentlyWinner = criterion.winners.includes(userId)
+      setUsers(prev => (prev || []).map(user => ({
+        ...user,
+        score: user.id === userId 
+          ? user.score + (isCurrentlyWinner ? -1 : 1)
+          : user.score
+      })))
+    }
 
-    toast.success('Winners selected! Scores updated.')
+    toast.success('Score updated!')
   }
 
   const toggleAnswerLock = () => {
@@ -302,7 +309,6 @@ function App() {
                       <div className="flex justify-between items-start">
                         <CardTitle className="font-body text-lg">{criterion.question}</CardTitle>
                         <div className="flex gap-1">
-                          {criterion.isComplete && <Trophy className="text-accent" size={20} />}
                           {answersLocked && <Lock className="text-muted-foreground" size={16} />}
                         </div>
                       </div>
@@ -327,12 +333,12 @@ function App() {
                               placeholder="Enter your prediction..."
                               value={newPredictions[criterion.id] || ''}
                               onChange={(e) => setNewPredictions(prev => ({ ...prev, [criterion.id]: e.target.value }))}
-                              disabled={answersLocked || criterion.isComplete}
+                              disabled={answersLocked}
                               className="font-body"
                             />
                             <Button 
                               onClick={() => submitPrediction(criterion.id)}
-                              disabled={!newPredictions[criterion.id]?.trim() || answersLocked || criterion.isComplete}
+                              disabled={!newPredictions[criterion.id]?.trim() || answersLocked}
                               size="sm"
                             >
                               Submit
@@ -341,7 +347,7 @@ function App() {
                         </div>
                       )}
 
-                      {criterion.isComplete && (
+                      {currentUser.isAdmin && (
                         <div className="space-y-2">
                           <Label className="font-body">All predictions:</Label>
                           <div className="space-y-1">
@@ -351,7 +357,7 @@ function App() {
                               return (
                                 <div key={pred.id} className={`flex justify-between p-2 rounded text-sm font-body ${isWinner ? 'bg-accent/20' : 'bg-muted'}`}>
                                   <span>{user?.name}: {pred.answer}</span>
-                                  {isWinner && <Trophy className="text-accent" size={16} />}
+                                  <Trophy className={`${isWinner ? 'text-accent' : 'text-transparent'}`} size={16} />
                                 </div>
                               )
                             })}
@@ -477,47 +483,27 @@ function App() {
                               const isWinner = criterion.winners.includes(pred.userId)
                               
                               return (
-                                <div key={pred.id} className="flex items-center justify-between p-2 border rounded">
+                                <div key={pred.id} className="flex items-center justify-between p-3 border rounded">
                                   <span className="font-body">
                                     <strong>{user?.name}:</strong> {pred.answer}
                                   </span>
-                                  {!criterion.isComplete && (
+                                  <div className="flex items-center gap-2">
                                     <Button
                                       size="sm"
                                       variant={isWinner ? "default" : "outline"}
-                                      onClick={() => {
-                                        const newWinners = isWinner 
-                                          ? criterion.winners.filter(id => id !== pred.userId)
-                                          : [...criterion.winners, pred.userId]
-                                        markWinners(criterion.id, newWinners)
-                                      }}
+                                      onClick={() => toggleWinner(criterion.id, pred.userId)}
                                       className="font-body"
                                     >
-                                      {isWinner ? <X className="mr-1" size={14} /> : <Check className="mr-1" size={14} />}
-                                      {isWinner ? 'Remove' : 'Winner'}
+                                      {isWinner ? <Check className="mr-1" size={14} /> : <X className="mr-1" size={14} />}
+                                      {isWinner ? 'Give Point' : 'No Point'}
                                     </Button>
-                                  )}
-                                  {isWinner && <Trophy className="text-accent ml-2" size={16} />}
+                                    {isWinner && <Trophy className="text-accent" size={16} />}
+                                  </div>
                                 </div>
                               )
                             })}
                           </div>
                         </div>
-                        
-                        {criterion.winners.length > 0 && !criterion.isComplete && (
-                          <Button 
-                            onClick={() => markWinners(criterion.id, criterion.winners)}
-                            className="w-full font-body"
-                          >
-                            Finalize Winners & Update Scores
-                          </Button>
-                        )}
-                        
-                        {criterion.isComplete && (
-                          <Badge className="w-full justify-center">
-                            Round Complete - Winners: {criterion.winners.map(id => (users || []).find(u => u.id === id)?.name).join(', ')}
-                          </Badge>
-                        )}
                       </CardContent>
                     </Card>
                   )
